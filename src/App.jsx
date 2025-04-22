@@ -5,7 +5,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider } from './contexts/AuthContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import PublicView from './components/PublicView';
+import PublicView from './components/ui/PublicView';
+import AdmissionForm from './components/AdmissionForm';
 import { useAuth } from './contexts/AuthContext';
 import Home from './components/Home';
 
@@ -35,6 +36,7 @@ function App() {
             <Route path="/" element={<PublicView />} />
             <Route path="/home" element={<Home />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/admission" element={<AdmissionForm />} />
             <Route
               path="/dashboard/*"
               element={

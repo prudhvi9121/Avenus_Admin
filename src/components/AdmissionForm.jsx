@@ -1,41 +1,22 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Grid,
-  MenuItem,
-  Typography,
-  CircularProgress,
   Paper,
+  Typography,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
 } from '@mui/material';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { toast } from 'react-toastify';
-import SchoolIcon from '@mui/icons-material/School';
+import Navbar from './ui/Navbar';
+import Footer from './ui/Footer';
 
-const grades = [
-  'Pre-KG',
-  'LKG',
-  'UKG',
-  'Grade 1',
-  'Grade 2',
-  'Grade 3',
-  'Grade 4',
-  'Grade 5',
-  'Grade 6',
-  'Grade 7',
-  'Grade 8',
-  'Grade 9',
-  'Grade 10',
-];
-
-const AdmissionForm = ({ open, onClose }) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const AdmissionForm = () => {
   const [formData, setFormData] = useState({
     studentName: '',
     dob: '',
@@ -47,202 +28,101 @@ const AdmissionForm = ({ open, onClose }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
     try {
-      // Validate required fields
-      const requiredFields = ['studentName', 'dob', 'gender', 'grade', 'email', 'phone'];
-      const missingFields = requiredFields.filter(field => !formData[field]);
-      
-      if (missingFields.length > 0) {
-        toast.error('Please fill in all required fields');
-        return;
-      }
-
-      // Add timestamp and initial status
-      const admissionData = {
+      await addDoc(collection(db, 'admissions'), {
         ...formData,
         status: 'pending',
         timestamp: serverTimestamp(),
-      };
-
-      // Save to Firestore
-      const admissionsRef = collection(db, 'admissions');
-      await addDoc(admissionsRef, admissionData);
-
-      toast.success('Admission application submitted successfully!');
-      onClose();
-      
-      // Reset form
-      setFormData({
-        studentName: '',
-        dob: '',
-        gender: '',
-        grade: '',
-        email: '',
-        phone: '',
       });
+      toast.success('Application submitted successfully');
+      // Reset form
+      setFormData({ studentName: '', dob: '', gender: '', grade: '', email: '', phone: '' });
     } catch (error) {
-      console.error('Error submitting admission form:', error);
-      toast.error('Failed to submit admission form. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      console.error('Error submitting application:', error);
+      toast.error('Failed to submit application');
     }
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        elevation: 0,
-        sx: {
-          borderRadius: 2,
-        }
-      }}
-    >
-      <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <SchoolIcon color="primary" sx={{ fontSize: 32 }} />
-          <Typography variant="h5" component="div">
-            Admission Application
+    <>
+       <Navbar />
+      <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 600, mx: 'auto' }}>
+        <Paper sx={{ p: { xs: 2, sm: 3 } }} elevation={3}>
+          <Typography variant="h5" gutterBottom>
+            New Admission Form
           </Typography>
+        <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            label="Student Name"
+            name="studentName"
+            value={formData.studentName}
+            onChange={handleChange}
+            required
+            fullWidth
+          />
+          <TextField
+            label="Date of Birth"
+            name="dob"
+            type="date"
+            value={formData.dob}
+            onChange={handleChange}
+            InputLabelProps={{ shrink: true }}
+            required
+            fullWidth
+          />
+          <FormControl fullWidth required>
+            <InputLabel id="gender-label">Gender</InputLabel>
+            <Select
+              labelId="gender-label"
+              name="gender"
+              value={formData.gender}
+              label="Gender"
+              onChange={handleChange}
+            >
+              <MenuItem value="Male">Male</MenuItem>
+              <MenuItem value="Female">Female</MenuItem>
+              <MenuItem value="Other">Other</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            label="Grade Applied For"
+            name="grade"
+            value={formData.grade}
+            onChange={handleChange}
+            required
+            fullWidth
+          />
+          <TextField
+            label="Email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            fullWidth
+          />
+          <TextField
+            label="Phone Number"
+            name="phone"
+            type="tel"
+            value={formData.phone}
+            onChange={handleChange}
+            required
+            fullWidth
+          />
+          <Button type="submit" variant="contained" sx={{ mt: 2 }}>
+            Submit Application
+          </Button>
         </Box>
-        <Typography variant="body2" color="text.secondary">
-          Please fill in all fields marked with *
-        </Typography>
-      </DialogTitle>
-
-      <DialogContent dividers>
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 3, 
-            bgcolor: 'background.default',
-            borderRadius: 2
-          }}
-        >
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <TextField
-                required
-                fullWidth
-                label="Student Name"
-                name="studentName"
-                value={formData.studentName}
-                onChange={handleChange}
-                variant="outlined"
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
-                required
-                fullWidth
-                type="date"
-                label="Date of Birth"
-                name="dob"
-                value={formData.dob}
-                onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
-                variant="outlined"
-              />
-            </Grid>
-
-            <Grid item xs={12} sm={6}>
-              <TextField
-                required
-                fullWidth
-                select
-                label="Gender"
-                name="gender"
-                value={formData.gender}
-                onChange={handleChange}
-                variant="outlined"
-              >
-                <MenuItem value="male">Male</MenuItem>
-                <MenuItem value="female">Female</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </TextField>
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                required
-                fullWidth
-                select
-                label="Grade Applying For"
-                name="grade"
-                value={formData.grade}
-                onChange={handleChange}
-                variant="outlined"
-              >
-                {grades.map((grade) => (
-                  <MenuItem key={grade} value={grade}>
-                    {grade}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                required
-                fullWidth
-                label="Email"
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                variant="outlined"
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <TextField
-                required
-                fullWidth
-                label="Phone Number"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                variant="outlined"
-              />
-            </Grid>
-          </Grid>
-        </Paper>
-      </DialogContent>
-
-      <DialogActions sx={{ px: 3, py: 2.5, gap: 1 }}>
-        <Button 
-          onClick={onClose}
-          variant="outlined"
-          color="inherit"
-          sx={{ borderRadius: 2 }}
-        >
-          Cancel
-        </Button>
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
-          sx={{ borderRadius: 2, px: 3 }}
-        >
-          {isSubmitting ? 'Submitting...' : 'Submit Application'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+      </Paper>
+    </Box>
+    <Footer />
+    </>
   );
 };
 
