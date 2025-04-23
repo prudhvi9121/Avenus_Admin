@@ -1,185 +1,360 @@
-import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { useModal } from '../contexts/ModalContext';
+import React, { useState } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Button,
+  Grid,
+  Divider,
+  Stack,
+  InputAdornment,
+  CircularProgress,
+} from '@mui/material';
+import {
+  Person,
+  Cake,
+  Phone,
+  Email,
+  Transgender,
+  Class,
+} from '@mui/icons-material';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { toast } from 'react-toastify';
+import Navbar from './Navbar';
+import Footer from './Footer';
 
-const AdmissionForm = () => {
-  const { closeModal } = useModal();
+const gradesList = [
+  'Nursery',
+  'LKG',
+  'UKG',
+  'Grade 1',
+  'Grade 2',
+  'Grade 3',
+  'Grade 4',
+  'Grade 5',
+  'Grade 6',
+  'Grade 7',
+  'Grade 8',
+  'Grade 9',
+  'Grade 10',
+  'Grade 11',
+  'Grade 12',
+];
+
+export default function AdmissionForm() {
   const [formData, setFormData] = useState({
     studentName: '',
-    dateOfBirth: '',
+    dob: '',
+    gender: '',
     grade: '',
-    parentName: '',
     email: '',
     phone: '',
-    address: '',
-    previousSchool: '',
-    message: ''
   });
+
+  const [errors, setErrors] = useState({
+    studentName: '',
+    dob: '',
+    gender: '',
+    grade: '',
+    email: '',
+    phone: '',
+  });
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const validateField = (name, value) => {
+    let error = '';
+    switch (name) {
+      case 'studentName':
+        error = value.trim() ? '' : 'Student name is required';
+        break;
+      case 'dob':
+        error = value ? '' : 'Date of birth is required';
+        break;
+      case 'gender':
+        error = value ? '' : 'Gender is required';
+        break;
+      case 'grade':
+        error = value ? '' : 'Grade is required';
+        break;
+      case 'email':
+        if (!value) {
+          error = 'Email is required';
+        } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(value)) {
+          error = 'Invalid email address';
+        }
+        break;
+      case 'phone':
+        if (!value) {
+          error = 'Phone number is required';
+        } else if (!/^[0-9]{10,15}$/.test(value)) {
+          error = 'Invalid phone number (10-15 digits)';
+        }
+        break;
+      default:
+        break;
+    }
+    return error;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Form submitted:', formData);
-    closeModal();
+  const validateForm = () => {
+    const newErrors = {};
+    Object.keys(formData).forEach((field) => {
+      newErrors[field] = validateField(field, formData[field]);
+    });
+    setErrors(newErrors);
+    return !Object.values(newErrors).some((error) => error);
   };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setSubmitting(true);
+    try {
+      await addDoc(collection(db, 'admissions'), {
+        ...formData,
+        status: 'pending',
+        timestamp: serverTimestamp(),
+      });
+      toast.success('Application submitted successfully! We will contact you soon.');
+      setFormData({
+        studentName: '',
+        dob: '',
+        gender: '',
+        grade: '',
+        email: '',
+        phone: '',
+      });
+    } catch (error) {
+      console.error('Submission error:', error);
+      toast.error(
+        error.code === 'permission-denied'
+          ? 'Submission failed: Authorization required'
+          : 'Submission failed. Please try again later.'
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const maxDate = new Date();
+  maxDate.setFullYear(maxDate.getFullYear() - 3);
+  const maxDateString = maxDate.toISOString().split('T')[0];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
-      className="bg-white rounded-xl shadow-xl overflow-hidden"
-    >
-      <div className="text-center bg-[#4195d1] text-white py-6 px-8">
-        <h2 className="text-3xl font-bold mb-2">Apply for Admission</h2>
-        <p className="text-white/90 text-lg">
-          Take the first step towards providing your child with an exceptional education experience.
-        </p>
-      </div>
+    <Box sx={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: '100vh',paddingTop: '100px' }}>
+      <Navbar />
+      <Box sx={{ py: 8, px: { xs: 2, sm: 4, md: 6 }, display: 'flex', justifyContent: 'center' }}>
+        <Card sx={{
+          maxWidth: 800,
+          width: '100%',
+          borderRadius: 4,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+          background: 'linear-gradient(145deg, #ffffff 30%, #f8f9fa 90%)',
+        }}>
+          <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+            <Typography variant="h4" gutterBottom align="center" sx={{
+              fontWeight: 700,
+              color: 'primary.main',
+              mb: 3,
+              textTransform: 'uppercase',
+              letterSpacing: 1.2,
+            }}>
+              Student Admission
+            </Typography>
+            <Divider sx={{ mb: 4, borderColor: 'divider' }} />
 
-      <div className="p-8">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="col-span-2">
-              <h3 className="text-2xl font-semibold text-[#4195d1] mb-4">Student Information</h3>
-            </div>
+            <Box component="form" onSubmit={handleSubmit} noValidate>
+              <Grid container spacing={4}>
+                {/* Student Name */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Student Name"
+                    name="studentName"
+                    value={formData.studentName}
+                    onChange={handleChange}
+                    required
+                    fullWidth
+                    variant="outlined"
+                    error={!!errors.studentName}
+                    helperText={errors.studentName}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Person sx={{ color: 'action.active' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
 
-            <div className="space-y-2">
-              <label className="block text-gray-700 font-medium">Student's Full Name</label>
-              <input
-                type="text"
-                name="studentName"
-                value={formData.studentName}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4195d1] focus:border-transparent transition"
-                required
-              />
-            </div>
+                {/* Date of Birth */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Date of Birth"
+                    name="dob"
+                    type="date"
+                    value={formData.dob}
+                    onChange={handleChange}
+                    InputLabelProps={{ shrink: true }}
+                    inputProps={{ max: maxDateString }}
+                    required
+                    fullWidth
+                    variant="outlined"
+                    error={!!errors.dob}
+                    helperText={errors.dob || 'Minimum age: 3 years'}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Cake sx={{ color: 'action.active' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
 
-            <div className="space-y-2">
-              <label className="block text-gray-700 font-medium">Date of Birth</label>
-              <input
-                type="date"
-                name="dateOfBirth"
-                value={formData.dateOfBirth}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4195d1] focus:border-transparent transition"
-                required
-              />
-            </div>
+                {/* Gender */}
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth required variant="outlined" error={!!errors.gender}>
+                    <InputLabel id="gender-label">Gender</InputLabel>
+                    <Select
+                      labelId="gender-label"
+                      name="gender"
+                      value={formData.gender}
+                      label="Gender"
+                      onChange={handleChange}
+                      startAdornment={
+                        <InputAdornment position="start">
+                          <Transgender sx={{ color: 'action.active', mr: 1 }} />
+                        </InputAdornment>
+                      }
+                    >
+                      <MenuItem value="Male">Male</MenuItem>
+                      <MenuItem value="Female">Female</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
+                    </Select>
+                    {errors.gender && (
+                      <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                        {errors.gender}
+                      </Typography>
+                    )}
+                  </FormControl>
+                </Grid>
 
-            <div className="space-y-2">
-              <label className="block text-gray-700 font-medium">Grade Applying For</label>
-              <select
-                name="grade"
-                value={formData.grade}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4195d1] focus:border-transparent transition"
-                required
-              >
-                <option value="">Select Grade</option>
-                <option value="nursery">Nursery</option>
-                <option value="kg">Kindergarten</option>
-                {[...Array(12)].map((_, i) => (
-                  <option key={i} value={`grade${i + 1}`}>
-                    Grade {i + 1}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {/* Grade */}
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth required variant="outlined" error={!!errors.grade}>
+                    <InputLabel id="grade-label">Grade Applied For</InputLabel>
+                    <Select
+                      labelId="grade-label"
+                      name="grade"
+                      value={formData.grade}
+                      label="Grade Applied For"
+                      onChange={handleChange}
+                      startAdornment={
+                        <InputAdornment position="start">
+                          <Class sx={{ color: 'action.active', mr: 1 }} />
+                        </InputAdornment>
+                      }
+                    >
+                      {gradesList.map((grade) => (
+                        <MenuItem key={grade} value={grade}>
+                          {grade}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    {errors.grade && (
+                      <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                        {errors.grade}
+                      </Typography>
+                    )}
+                  </FormControl>
+                </Grid>
 
-            <div className="space-y-2">
-              <label className="block text-gray-700 font-medium">Previous School (if any)</label>
-              <input
-                type="text"
-                name="previousSchool"
-                value={formData.previousSchool}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4195d1] focus:border-transparent transition"
-              />
-            </div>
+                {/* Email */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    fullWidth
+                    variant="outlined"
+                    error={!!errors.email}
+                    helperText={errors.email}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Email sx={{ color: 'action.active' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
 
-            <div className="col-span-2">
-              <h3 className="text-2xl font-semibold text-[#4195d1] mt-6 mb-4">Parent/Guardian Information</h3>
-            </div>
+                {/* Phone */}
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    label="Phone Number"
+                    name="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    required
+                    fullWidth
+                    variant="outlined"
+                    error={!!errors.phone}
+                    helperText={errors.phone || '10-15 digits without spaces'}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Phone sx={{ color: 'action.active' }} />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Grid>
+              </Grid>
 
-            <div className="space-y-2">
-              <label className="block text-gray-700 font-medium">Parent's Full Name</label>
-              <input
-                type="text"
-                name="parentName"
-                value={formData.parentName}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4195d1] focus:border-transparent transition"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-gray-700 font-medium">Email Address</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4195d1] focus:border-transparent transition"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-gray-700 font-medium">Phone Number</label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4195d1] focus:border-transparent transition"
-                required
-              />
-            </div>
-
-            <div className="col-span-2 space-y-2">
-              <label className="block text-gray-700 font-medium">Residential Address</label>
-              <input
-                type="text"
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4195d1] focus:border-transparent transition"
-                required
-              />
-            </div>
-
-            <div className="col-span-2 space-y-2">
-              <label className="block text-gray-700 font-medium">Additional Message</label>
-              <textarea
-                name="message"
-                value={formData.message}
-                onChange={handleChange}
-                rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4195d1] focus:border-transparent transition"
-              />
-            </div>
-          </div>
-
-          <div className="mt-8 text-center">
-            <button
-              type="submit"
-              className="bg-[#4195d1] text-white px-8 py-3 rounded-lg font-semibold hover:bg-[#3784c0] transform hover:scale-105 transition-all duration-300"
-            >
-              Submit Application
-            </button>
-          </div>
-        </form>
-      </div>
-    </motion.div>
+              <Stack direction="row" justifyContent="center" sx={{ mt: 6 }}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  size="large"
+                  sx={{
+                    px: 8,
+                    py: 1.5,
+                    fontSize: '1.1rem',
+                    '&:hover': { transform: 'translateY(-2px)' },
+                    transition: 'all 0.3s ease',
+                  }}
+                  disabled={submitting}
+                  startIcon={submitting ? <CircularProgress size={24} sx={{ color: 'inherit' }} /> : null}
+                >
+                  {submitting ? 'Submitting...' : 'Submit Application'}
+                </Button>
+              </Stack>
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
+      <Footer />
+    </Box>
   );
-};
-
-export default AdmissionForm;
+}

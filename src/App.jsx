@@ -6,9 +6,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import PublicView from './components/ui/PublicView';
-import AdmissionForm from './components/AdmissionForm';
+import AdmissionForm from './components/ui/AdmissionForm';
 import { useAuth } from './contexts/AuthContext';
-import Home from './components/Home';
 
 const theme = createTheme({
   palette: {
@@ -34,7 +33,6 @@ function App() {
         <AuthProvider>
           <Routes>
             <Route path="/" element={<PublicView />} />
-            <Route path="/home" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/admission" element={<AdmissionForm />} />
             <Route

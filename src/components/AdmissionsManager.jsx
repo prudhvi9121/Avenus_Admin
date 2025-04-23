@@ -1,29 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
   Chip,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   Button,
-  Tooltip,
+  IconButton,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import {
+  DataGrid,
+  GridToolbarContainer,
+  GridToolbarExport,
+  GridToolbarFilterButton,
+  GridToolbarColumnsButton,
+} from '@mui/x-data-grid';
+import {
+  Visibility,
+  CheckCircle,
+  Cancel,
+  Delete,
+} from '@mui/icons-material';
+import { collection, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { toast } from 'react-toastify';
 
@@ -31,8 +33,11 @@ const AdmissionsManager = () => {
   const [admissions, setAdmissions] = useState([]);
   const [selectedAdmission, setSelectedAdmission] = useState(null);
   const [open, setOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [admissionToDelete, setAdmissionToDelete] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [loading, setLoading] = useState(true);
 
   const fetchAdmissions = async () => {
     try {
@@ -46,6 +51,8 @@ const AdmissionsManager = () => {
     } catch (error) {
       console.error('Error fetching admissions:', error);
       toast.error('Failed to fetch admissions');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -53,8 +60,8 @@ const AdmissionsManager = () => {
     fetchAdmissions();
   }, []);
 
-  const handleViewDetails = (admission) => {
-    setSelectedAdmission(admission);
+  const handleViewDetails = (params) => {
+    setSelectedAdmission(params.row);
     setOpen(true);
   };
 
@@ -67,161 +74,230 @@ const AdmissionsManager = () => {
     try {
       const admissionRef = doc(db, 'admissions', admissionId);
       await updateDoc(admissionRef, { status: newStatus });
-      toast.success(`Application ${newStatus === 'approved' ? 'approved' : 'rejected'} successfully`);
+      toast.success(`Application ${newStatus} successfully`);
       fetchAdmissions();
-      if (open) {
-        setOpen(false);
-      }
+      setOpen(false);
     } catch (error) {
       console.error('Error updating admission status:', error);
       toast.error('Failed to update application status');
     }
   };
 
-  const getStatusChipColor = (status) => {
-    switch (status) {
-      case 'pending':
-        return 'warning';
-      case 'approved':
-        return 'success';
-      case 'rejected':
-        return 'error';
-      default:
-        return 'default';
+  const handleDeleteClick = (params) => {
+    setAdmissionToDelete(params.row);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!admissionToDelete) return;
+    
+    try {
+      const admissionRef = doc(db, 'admissions', admissionToDelete.id);
+      await deleteDoc(admissionRef);
+      toast.success('Application deleted successfully');
+      fetchAdmissions();
+    } catch (error) {
+      console.error('Error deleting admission:', error);
+      toast.error('Failed to delete application');
+    } finally {
+      setDeleteDialogOpen(false);
+      setAdmissionToDelete(null);
     }
   };
 
-  // Safely format date
-  const formatDate = (timestamp) => {
-    if (!timestamp || !timestamp.toDate) {
-      return 'N/A';
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setAdmissionToDelete(null);
+  };
+
+  const getStatusChip = (params) => (
+    <Chip
+      label={params.value || 'pending'}
+      color={getStatusChipColor(params.value)}
+      size="small"
+      sx={{ fontWeight: 500 }}
+    />
+  );
+
+  const getStatusChipColor = (status) => {
+    switch (status) {
+      case 'pending': return 'warning';
+      case 'approved': return 'success';
+      case 'rejected': return 'error';
+      default: return 'default';
     }
+  };
+
+  const formatDate = (params) => {
+    if (!params.value) return 'N/A';
+    
     try {
-      return new Date(timestamp.toDate()).toLocaleDateString();
+      // Handle Firestore Timestamp objects
+      if (params.value.toDate && typeof params.value.toDate === 'function') {
+        return params.value.toDate().toLocaleDateString();
+      }
+      
+      // Handle Date objects or timestamp numbers
+      if (params.value instanceof Date) {
+        return params.value.toLocaleDateString();
+      }
+      
+      // Handle timestamp as numbers or strings
+      if (typeof params.value === 'number' || typeof params.value === 'string') {
+        return new Date(params.value).toLocaleDateString();
+      }
+      
+      return 'N/A';
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Invalid Date';
     }
   };
 
-  // Determine which columns to show based on screen size
-  const getVisibleColumns = () => {
-    if (isMobile) {
-      return ['Name', 'Status', 'Actions'];
-    }
-    return ['Name', 'Email', 'Phone', 'Grade', 'Status', 'Date', 'Actions'];
-  };
+  const actionButtons = (params) => (
+    <Box sx={{ display: 'flex', gap: 1 }}>
+      <IconButton
+        size="small"
+        onClick={() => handleViewDetails(params)}
+        color="info"
+        sx={{ '&:hover': { backgroundColor: theme.palette.info.light } }}
+      >
+        <Visibility fontSize="small" />
+      </IconButton>
+      {params.row.status === 'pending' && (
+        <>
+          <IconButton
+            size="small"
+            onClick={() => handleStatusUpdate(params.id, 'approved')}
+            color="success"
+            sx={{ '&:hover': { backgroundColor: theme.palette.success.light } }}
+          >
+            <CheckCircle fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => handleStatusUpdate(params.id, 'rejected')}
+            color="error"
+            sx={{ '&:hover': { backgroundColor: theme.palette.error.light } }}
+          >
+            <Cancel fontSize="small" />
+          </IconButton>
+        </>
+      )}
+      <IconButton
+        size="small"
+        onClick={() => handleDeleteClick(params)}
+        color="error"
+        sx={{ '&:hover': { backgroundColor: theme.palette.error.light } }}
+      >
+        <Delete fontSize="small" />
+      </IconButton>
+    </Box>
+  );
 
-  const visibleColumns = getVisibleColumns();
+  const columns = [
+    { 
+      field: 'studentName', 
+      headerName: 'Student Name', 
+      flex: 1,
+      minWidth: 150,
+    },
+    { 
+      field: 'email', 
+      headerName: 'Email', 
+      flex: 1,
+      minWidth: 200,
+      hide: isMobile,
+    },
+    { 
+      field: 'phone', 
+      headerName: 'Phone', 
+      flex: 1,
+      minWidth: 130,
+      hide: isMobile,
+    },
+    { 
+      field: 'grade', 
+      headerName: 'Grade', 
+      flex: 1,
+      minWidth: 120,
+    },
+    { 
+      field: 'status', 
+      headerName: 'Status', 
+      flex: 1,
+      minWidth: 120,
+      renderCell: getStatusChip,
+    },
+    { 
+      field: 'timestamp', 
+      headerName: 'Date', 
+      flex: 1,
+      minWidth: 120,
+      valueFormatter: formatDate,
+      hide: isMobile,
+    },
+    { 
+      field: 'actions', 
+      headerName: 'Actions', 
+      flex: 1,
+      minWidth: 180, // Increased width to accommodate the delete button
+      renderCell: actionButtons,
+      sortable: false,
+      filterable: false,
+    },
+  ];
+
+  const CustomToolbar = () => (
+    <GridToolbarContainer sx={{ gap: 1, p: 2 }}>
+      <GridToolbarColumnsButton />
+      <GridToolbarFilterButton />
+      <GridToolbarExport 
+        printOptions={{ disableToolbarButton: true }}
+        sx={{ ml: 'auto' }}
+      />
+    </GridToolbarContainer>
+  );
 
   return (
     <Box sx={{ 
-      p: { xs: 1, sm: 2, md: 3 },
-      overflow: 'hidden',
+      height: '80vh',
       width: '100%',
-      maxWidth: '100%',
-      boxSizing: 'border-box'
+      p: { xs: 1, sm: 2 },
+      bgcolor: 'background.paper',
+      borderRadius: 2,
     }}>
-      <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
+      <Typography variant="h5" gutterBottom sx={{ mb: 2, fontWeight: 600 }}>
         Admission Applications
       </Typography>
 
-      <TableContainer 
-        component={Paper} 
-        sx={{ 
-          mb: 3,
-          overflow: 'auto',
-          width: '100%',
-          maxWidth: '100%',
-          boxShadow: 1
+      <DataGrid
+        rows={admissions}
+        columns={columns}
+        loading={loading}
+        pageSizeOptions={[5, 10, 25]}
+        initialState={{
+          pagination: {
+            paginationModel: { pageSize: 10, page: 0 },
+          },
         }}
-      >
-        <Table aria-label="admissions table" sx={{ minWidth: isMobile ? 300 : 650 }}>
-          <TableHead>
-            <TableRow>
-              {visibleColumns.includes('Name') && <TableCell>Name</TableCell>}
-              {visibleColumns.includes('Email') && <TableCell>Email</TableCell>}
-              {visibleColumns.includes('Phone') && <TableCell>Phone</TableCell>}
-              {visibleColumns.includes('Grade') && <TableCell>Grade</TableCell>}
-              {visibleColumns.includes('Status') && <TableCell>Status</TableCell>}
-              {visibleColumns.includes('Date') && <TableCell>Date</TableCell>}
-              {visibleColumns.includes('Actions') && <TableCell align="right">Actions</TableCell>}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {admissions.length > 0 ? (
-              admissions.map((admission) => (
-                <TableRow key={admission.id}>
-                  {visibleColumns.includes('Name') && <TableCell>{admission.studentName || 'N/A'}</TableCell>}
-                  {visibleColumns.includes('Email') && <TableCell>{admission.email || 'N/A'}</TableCell>}
-                  {visibleColumns.includes('Phone') && <TableCell>{admission.phone || 'N/A'}</TableCell>}
-                  {visibleColumns.includes('Grade') && <TableCell>{admission.grade || 'N/A'}</TableCell>}
-                  {visibleColumns.includes('Status') && (
-                    <TableCell>
-                      <Chip
-                        label={admission.status || 'pending'}
-                        color={getStatusChipColor(admission.status)}
-                        size="small"
-                      />
-                    </TableCell>
-                  )}
-                  {visibleColumns.includes('Date') && (
-                    <TableCell>{formatDate(admission.timestamp)}</TableCell>
-                  )}
-                  {visibleColumns.includes('Actions') && (
-                    <TableCell align="right">
-                      <Box sx={{ 
-                        display: 'flex', 
-                        justifyContent: 'flex-end',
-                        gap: 0.5
-                      }}>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleViewDetails(admission)}
-                            color="info"
-                          >
-                            <VisibilityIcon />
-                          </IconButton>
-                        </Tooltip>
-                        {admission.status === 'pending' && (
-                          <>
-                            <Tooltip title="Approve">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleStatusUpdate(admission.id, 'approved')}
-                                color="success"
-                              >
-                                <CheckCircleIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Reject">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleStatusUpdate(admission.id, 'rejected')}
-                                color="error"
-                              >
-                                <CancelIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
-                      </Box>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={visibleColumns.length} align="center">
-                  No admission applications found
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+        slots={{
+          toolbar: CustomToolbar,
+        }}
+        sx={{
+          border: 'none',
+          '& .MuiDataGrid-cell': {
+            borderBottom: `1px solid ${theme.palette.divider}`,
+          },
+          '& .MuiDataGrid-columnHeaders': {
+            bgcolor: theme.palette.grey[100],
+            borderBottom: `2px solid ${theme.palette.divider}`,
+          },
+        }}
+        disableRowSelectionOnClick
+      />
 
+      {/* Details Dialog */}
       <Dialog
         open={open}
         onClose={handleClose}
@@ -229,55 +305,63 @@ const AdmissionsManager = () => {
         fullWidth
         PaperProps={{
           sx: {
-            m: { xs: 1, sm: 2 },
-            width: '100%',
-            maxHeight: '90vh'
+            borderRadius: 3,
+            boxShadow: theme.shadows[4],
           }
         }}
       >
-        <DialogTitle>
+        <DialogTitle sx={{ bgcolor: theme.palette.grey[100], fontWeight: 600 }}>
           Application Details
         </DialogTitle>
-        <DialogContent dividers sx={{ p: { xs: 1, sm: 2 } }}>
+        <DialogContent dividers sx={{ p: 3 }}>
           {selectedAdmission && (
-            <Box sx={{ p: { xs: 1, sm: 2 } }}>
-              <Typography variant="h6" gutterBottom>
-                Student Information
-              </Typography>
-              <Box sx={{ mb: 3 }}>
-                <Typography><strong>Name:</strong> {selectedAdmission.studentName || 'N/A'}</Typography>
-                <Typography><strong>Date of Birth:</strong> {selectedAdmission.dob || 'N/A'}</Typography>
-                <Typography><strong>Gender:</strong> {selectedAdmission.gender || 'N/A'}</Typography>
-                <Typography><strong>Grade Applied For:</strong> {selectedAdmission.grade || 'N/A'}</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3 }}>
+              <Box>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+                  Student Information
+                </Typography>
+                <DetailItem label="Name" value={selectedAdmission.studentName} />
+                <DetailItem label="Date of Birth" value={selectedAdmission.dob} />
+                <DetailItem label="Gender" value={selectedAdmission.gender} />
+                <DetailItem label="Grade Applied" value={selectedAdmission.grade} />
               </Box>
-
-              <Typography variant="h6" gutterBottom>
-                Contact Information
-              </Typography>
-              <Box sx={{ mb: 3 }}>
-                <Typography><strong>Email:</strong> {selectedAdmission.email || 'N/A'}</Typography>
-                <Typography><strong>Phone:</strong> {selectedAdmission.phone || 'N/A'}</Typography>
-              </Box>
-
-              <Box sx={{ mt: 2 }}>
-                <Typography><strong>Application Status:</strong></Typography>
-                <Chip
-                  label={selectedAdmission.status || 'pending'}
-                  color={getStatusChipColor(selectedAdmission.status)}
-                  sx={{ mt: 1 }}
-                />
+              
+              <Box>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+                  Contact Information
+                </Typography>
+                <DetailItem label="Email" value={selectedAdmission.email} />
+                <DetailItem label="Phone" value={selectedAdmission.phone} />
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+                    Application Status
+                  </Typography>
+                  <Chip
+                    label={selectedAdmission.status}
+                    color={getStatusChipColor(selectedAdmission.status)}
+                    sx={{ px: 2, py: 1 }}
+                  />
+                </Box>
               </Box>
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: { xs: 1.5, sm: 2 } }}>
-          <Button onClick={handleClose}>Close</Button>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button 
+            onClick={handleClose}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
+            Close
+          </Button>
           {selectedAdmission?.status === 'pending' && (
             <>
               <Button
                 onClick={() => handleStatusUpdate(selectedAdmission.id, 'approved')}
                 color="success"
                 variant="contained"
+                startIcon={<CheckCircle />}
+                sx={{ borderRadius: 2 }}
               >
                 Approve
               </Button>
@@ -285,6 +369,8 @@ const AdmissionsManager = () => {
                 onClick={() => handleStatusUpdate(selectedAdmission.id, 'rejected')}
                 color="error"
                 variant="contained"
+                startIcon={<Cancel />}
+                sx={{ borderRadius: 2 }}
               >
                 Reject
               </Button>
@@ -292,8 +378,58 @@ const AdmissionsManager = () => {
           )}
         </DialogActions>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: theme.shadows[4],
+          }
+        }}
+      >
+        <DialogTitle sx={{ bgcolor: theme.palette.grey[100], fontWeight: 600 }}>
+          Confirm Deletion
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2, mt: 1 }}>
+          <Typography variant="body1">
+            Are you sure you want to delete the application for {admissionToDelete?.studentName}? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button 
+            onClick={handleDeleteCancel}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteConfirm}
+            color="error"
+            variant="contained"
+            startIcon={<Delete />}
+            sx={{ borderRadius: 2 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
+
+const DetailItem = ({ label, value }) => (
+  <Box sx={{ mb: 1.5 }}>
+    <Typography variant="body2" color="text.secondary">{label}</Typography>
+    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+      {value || 'N/A'}
+    </Typography>
+  </Box>
+);
 
 export default AdmissionsManager;

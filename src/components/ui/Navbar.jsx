@@ -11,6 +11,7 @@ const Navbar = memo(() => {
     { title: 'Avenues Schooling', href: '/avenues-schooling', isRoute: true },
     { title: 'Avenues Activities', href: '#avenuesActivities', isRoute: false },
     { title: 'Contact', href: '#contact', isRoute: false },
+    { title: 'Admission', href: '/admission', isRoute: true },
   ];
 
   const handleScroll = (e, href) => {
@@ -57,9 +58,11 @@ const Navbar = memo(() => {
         </div>
 
         {/* Admission Button - Desktop */}
+        <Link to="/admission">
         <button className="hidden md:block px-6 py-2 bg-gradient-to-r from-[#00833e] via-[#6cb33f] to-[#406ab4] text-white rounded-lg shadow-md hover:opacity-90 transition-all duration-300 text-base">
           Admission
         </button>
+        </Link>
 
         {/* Mobile Menu Button */}
         <button
@@ -115,7 +118,6 @@ const Navbar = memo(() => {
             )
           )}
           <button
-            onClick={() => setIsOpen(false)}
             className="w-full text-left px-4 py-2 bg-gradient-to-r from-[#00833e] via-[#6cb33f] to-[#406ab4] text-white rounded-lg shadow-md hover:opacity-90 transition-all duration-300 text-sm"
           >
             Admission
